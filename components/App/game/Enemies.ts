@@ -75,7 +75,7 @@ export class Enemy {
         this.orbitSpeed = 0.2 + Math.random() * 0.3;
         
         this.attackTimer = 4000 + Math.random() * 6000;
-        this.velocity = 45; // Start slow
+        this.velocity = manager.screen.settings.enemySpeed * 0.75; // Start slow
     }
 
     update(ts: number, playerPos: vec3) {
@@ -87,7 +87,7 @@ export class Enemy {
             this.attackTimer -= ts;
             if (this.attackTimer <= 0) {
                 this.state = 'attack';
-                this.velocity = 60; // Attack speed is moderately faster but slower than player 
+                this.velocity = this.manager.screen.settings.enemySpeed; // Attack speed
             }
             
             this.orbitAngle += this.orbitSpeed * (ts / 1000);
@@ -105,7 +105,7 @@ export class Enemy {
             if (distToPlayer < 100) { // close enough, break off
                 this.state = 'orbit';
                 this.attackTimer = 5000 + Math.random() * 5000;
-                this.velocity = 45;
+                this.velocity = this.manager.screen.settings.enemySpeed * 0.75;
                 
                 // Recalculate orbit to be where we currently are so it doesn't jerk strongly
                 this.orbitRadius = 150 + Math.random() * 100;
@@ -113,7 +113,7 @@ export class Enemy {
             
             this.fireTimer -= ts;
             if (this.fireTimer <= 0 && distToPlayer < 300 && this.state === 'attack') {
-                this.fireTimer = 400 + Math.random() * 400; // slower fire rate
+                this.fireTimer = this.manager.screen.settings.enemyFireRate * (0.8 + Math.random() * 0.4); 
                 
                 const forward = [
                     Math.sin(this.yaw) * Math.cos(this.pitch),
@@ -236,6 +236,27 @@ export class Enemy {
         UT.MAT4_MULTIPLY(tRMat, UT.MAT4_TRANSLATE(0.5, 0.5, -1.2), tRMat);
         UT.MAT4_MULTIPLY(tRMat, UT.MAT4_ROTATE_Z(0.3), tRMat);
         gfx3MeshRenderer.drawMesh(this.manager.tailMesh, tRMat);
+
+        this.drawHealthBar();
+    }
+
+    drawHealthBar() {
+        if (!this.manager.screen.settings.showHealthBars) return;
+        const hpPercentage = Math.max(0, this.health / 100);
+        if (hpPercentage >= 1.0) return; // Only show if damaged
+
+        const barWidth = 4.0;
+        const barHeight = 0.4;
+        
+        const mat = UT.MAT4_IDENTITY();
+        UT.MAT4_MULTIPLY(mat, UT.MAT4_TRANSLATE(this.position[0], this.position[1] + 4.0, this.position[2]), mat);
+        
+        const hpMat = UT.MAT4_IDENTITY();
+        UT.MAT4_MULTIPLY(hpMat, mat, hpMat);
+        UT.MAT4_MULTIPLY(hpMat, UT.MAT4_SCALE(hpPercentage * barWidth, barHeight, 0.1), hpMat);
+        
+        const mesh = hpPercentage > 0.4 ? this.manager.healthBarGreen : this.manager.healthBarRed;
+        gfx3MeshRenderer.drawMesh(mesh, hpMat);
     }
 }
 
@@ -244,6 +265,7 @@ export class EnemyManager {
     enemyBullets: BulletManager;
     explosions: ExplosionParticle[] = [];
     score: number = 0;
+    screen: any;
     
     // Meshes
     bodyMesh: Gfx3Mesh;
@@ -252,8 +274,11 @@ export class EnemyManager {
     engineMesh: Gfx3Mesh;
     tailMesh: Gfx3Mesh;
     explosionMesh: Gfx3Mesh;
+    healthBarGreen: Gfx3Mesh;
+    healthBarRed: Gfx3Mesh;
     
-    constructor() {
+    constructor(screen: any) {
+        this.screen = screen;
         this.enemyBullets = new BulletManager([1.0, 0.2, 0.1]); // Red bullets
         
         // Stealth/Sci-fi dark fighter colors
@@ -268,6 +293,8 @@ export class EnemyManager {
         this.cockpitMesh = createBoxMesh(0.5, 0.3, 0.8, glassColor);
         this.engineMesh = createBoxMesh(0.4, 0.4, 1.0, engineGlow);
         this.tailMesh = createBoxMesh(0.1, 1.0, 0.8, darkMetal);
+        this.healthBarGreen = createBoxMesh(1.0, 1.0, 1.0, [0.1, 1.0, 0.2]); 
+        this.healthBarRed = createBoxMesh(1.0, 1.0, 1.0, [1.0, 0.1, 0.1]); 
         
         // simple red/orange mesh for explosion parts
         this.explosionMesh = createBoxMesh(1.0, 1.0, 1.0, [1.0, 0.4, 0.0]);
@@ -310,8 +337,8 @@ export class EnemyManager {
             }
         }
 
-        // Keep 5 enemies active total
-        if (this.enemies.length < 5) {
+        // Keep enemies active total based on settings
+        if (this.enemies.length < this.screen.settings.enemySpawnLimit) {
             // Spawn in front of the player
             // playerRot -> forward vector
             const forward = playerRot.rotateVector([0, 0, -1]);

@@ -39,6 +39,16 @@ export class GameScreen extends Screen {
   virtualMouseY: number = 0;
 
   nextWingLeft: boolean = true;
+
+  // Tunable settings
+  settings = {
+      enemySpawnLimit: 5,
+      enemySpeed: 60,
+      enemyFireRate: 600,
+      playerFireRate: 60,
+      playerAgility: 1.0,
+      showHealthBars: true
+  };
   
   constructor() {
     super();
@@ -46,7 +56,7 @@ export class GameScreen extends Screen {
     this.plane = new Plane();
     this.level = new Environment();
     this.bulletManager = new BulletManager([1.0, 0.0, 0.0]); // Glowing red player lasers
-    this.enemyManager = new EnemyManager();
+    this.enemyManager = new EnemyManager(this);
   }
 
   async onEnter() {
@@ -157,7 +167,7 @@ export class GameScreen extends Screen {
         this.fireCooldown -= ts;
     }
     if (fireInput && this.fireCooldown <= 0 && !this.plane.isLanded) {
-        this.fireCooldown = 60.0; // Faster machine-gun style firing
+        this.fireCooldown = this.settings.playerFireRate; // Faster machine-gun style firing
         
         // Shoot from under wings
         const planePos = this.plane.getPosition();

@@ -264,10 +264,144 @@ const VirtualJoystickDisplay = ({ gameRef }: { gameRef: React.MutableRefObject<G
     );
 };
 
+const KeyboardInstructions = () => {
+    const controls = [
+        { keys: 'W / S', action: 'THROTTLE' },
+        { keys: 'A / D', action: 'ROLL' },
+        { keys: 'MOUSE / ARROWS', action: 'PITCH & YAW' },
+        { keys: 'Q / E', action: 'YAW L/R' },
+        { keys: 'SPACE / L-CLICK', action: 'FIRE' },
+        { keys: 'SHIFT + A/D', action: 'BARREL ROLL' },
+    ];
+
+    return (
+        <div style={{ ...styles.dataBlock, width: '220px', gap: '8px' }}>
+            <span style={styles.label}>Control Schema</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {controls.map((c, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ ...styles.value, fontSize: '9px', color: TOKENS.Content.Label }}>{c.action}</span>
+                        <span style={{ ...styles.value, fontSize: '10px', color: TOKENS.Content.Value }}>{c.keys}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const GameSettingsPanel = ({ gameRef, isOpen, onToggle }: { gameRef: React.MutableRefObject<GameScreen | null>, isOpen: boolean, onToggle: () => void }) => {
+    const [, forceUpdate] = useState({});
+    
+    if (!isOpen) return null;
+
+    const settings = gameRef.current?.settings;
+    if (!settings) return null;
+
+    const handleChange = (key: keyof typeof settings, value: any) => {
+        if (settings) {
+            (settings as any)[key] = value;
+            forceUpdate({});
+        }
+    };
+
+    const rowStyle = {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '8px 0',
+        borderBottom: `1px solid ${TOKENS.Surface.Border}`
+    };
+
+    const inputStyle = {
+        backgroundColor: 'transparent',
+        border: `1px solid ${TOKENS.Surface.Border}`,
+        color: TOKENS.Content.Value,
+        fontFamily: TOKENS.Font.Mono,
+        fontSize: '11px',
+        padding: '4px 8px',
+        width: '60px',
+        textAlign: 'right' as const
+    };
+
+    return (
+        <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            style={{ 
+                ...styles.dataBlock, 
+                position: 'fixed' as const,
+                right: '32px',
+                top: '200px',
+                width: '280px',
+                pointerEvents: 'auto' as const,
+                zIndex: 100
+            }}
+        >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <span style={styles.label}>Tuning Matrix</span>
+                <button 
+                    onClick={onToggle}
+                    style={{ background: 'none', border: 'none', color: TOKENS.Content.Label, cursor: 'pointer', fontSize: '10px' }}
+                >
+                    CLOSE
+                </button>
+            </div>
+
+            <div style={rowStyle}>
+                <span style={{ ...styles.label, fontSize: '10px' }}>Spawn Limit</span>
+                <input 
+                    type="number" 
+                    style={inputStyle} 
+                    value={settings.enemySpawnLimit} 
+                    onChange={e => handleChange('enemySpawnLimit', parseInt(e.target.value))} 
+                />
+            </div>
+            <div style={rowStyle}>
+                <span style={{ ...styles.label, fontSize: '10px' }}>Enemy Speed</span>
+                <input 
+                    type="number" 
+                    style={inputStyle} 
+                    value={settings.enemySpeed} 
+                    onChange={e => handleChange('enemySpeed', parseInt(e.target.value))} 
+                />
+            </div>
+            <div style={rowStyle}>
+                <span style={{ ...styles.label, fontSize: '10px' }}>Enemy Fire Rate (ms)</span>
+                <input 
+                    type="number" 
+                    style={inputStyle} 
+                    value={settings.enemyFireRate} 
+                    onChange={e => handleChange('enemyFireRate', parseInt(e.target.value))} 
+                />
+            </div>
+            <div style={rowStyle}>
+                <span style={{ ...styles.label, fontSize: '10px' }}>Player Fire Rate (ms)</span>
+                <input 
+                    type="number" 
+                    style={inputStyle} 
+                    value={settings.playerFireRate} 
+                    onChange={e => handleChange('playerFireRate', parseInt(e.target.value))} 
+                />
+            </div>
+            <div style={rowStyle}>
+                <span style={{ ...styles.label, fontSize: '10px' }}>Enemy HealthBars</span>
+                <button 
+                    style={{ ...inputStyle, width: 'auto' }}
+                    onClick={() => handleChange('showHealthBars', !settings.showHealthBars)}
+                >
+                    {settings.showHealthBars ? 'ENABLED' : 'DISABLED'}
+                </button>
+            </div>
+        </motion.div>
+    );
+};
+
 // --- APP COMPONENT ---
 
 const App = () => {
     const [isReady, setIsReady] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const gameScreenRef = useRef<GameScreen | null>(null);
 
     useEffect(() => {
@@ -351,8 +485,11 @@ const App = () => {
                         </div>
                         
                         <div style={{ display: 'flex', gap: '16px' }}>
-                            <ScoreDisplay gameRef={gameScreenRef} />
-                            <HealthBar gameRef={gameScreenRef} />
+                            <KeyboardInstructions />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <ScoreDisplay gameRef={gameScreenRef} />
+                                <HealthBar gameRef={gameScreenRef} />
+                            </div>
                         </div>
                     </div>
 
@@ -377,11 +514,38 @@ const App = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                         <Joystick onChange={handleJoystickChange} />
                         
-                        <div style={{ ...styles.dataBlock, opacity: 0.8 }}>
+                        <div style={{ ...styles.dataBlock, opacity: 0.8, pointerEvents: 'auto' }}>
                             <span style={styles.label}>Control Link</span>
-                            <span style={{ ...styles.value, fontSize: '10px' }}>ESTABLISHED // SECURE</span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                                <span style={{ ...styles.value, fontSize: '10px' }}>ESTABLISHED // SECURE</span>
+                                <button 
+                                    onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                                    style={{ 
+                                        background: isSettingsOpen ? TOKENS.Content.Accent : 'rgba(255,255,255,0.1)', 
+                                        border: 'none', 
+                                        borderRadius: '2px',
+                                        color: isSettingsOpen ? '#000' : TOKENS.Content.Value,
+                                        fontFamily: TOKENS.Font.Mono,
+                                        fontSize: '9px',
+                                        padding: '4px 8px',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    {isSettingsOpen ? 'CLOSE MATRIX' : 'TUNE SYSTEM'}
+                                </button>
+                            </div>
                         </div>
                     </div>
+
+                    <AnimatePresence>
+                        {isSettingsOpen && (
+                            <GameSettingsPanel 
+                                gameRef={gameScreenRef} 
+                                isOpen={isSettingsOpen} 
+                                onToggle={() => setIsSettingsOpen(false)} 
+                            />
+                        )}
+                    </AnimatePresence>
                 </div>
             )}
 
